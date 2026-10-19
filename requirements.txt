@@ -1,5 +1,5 @@
 
 Flask
 google-genai
-gunicorn
-      
+gunicorn 
+pypdf 
