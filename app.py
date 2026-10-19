@@ -5,7 +5,8 @@ import sqlite3
 from datetime import datetime
 
 from flask import (
-    Flask, jsonify, request, render_template_string
+    Flask, jsonify, request, render_template_string,
+    send_from_directory
 )
 from werkzeug.utils import secure_filename
 from pypdf import PdfReader
@@ -736,7 +737,17 @@ def too_large(error):
 
 @app.route("/")
 def home():
-    return render_template_string(PAGE)
+    return send_from_directory(BASE_DIR, "index.html")
+
+
+@app.route("/style.css")
+def serve_css():
+    return send_from_directory(BASE_DIR, "style.css")
+
+
+@app.route("/script.js")
+def serve_js():
+    return send_from_directory(BASE_DIR, "script.js")
 
 
 @app.route("/api/chats", methods=["GET"])
