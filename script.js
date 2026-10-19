@@ -1,38 +1,53 @@
-﻿
+
 var form = document.getElementById("chatForm");
 var input = document.getElementById("userInput");
 var messages = document.getElementById("messages");
 var welcome = document.getElementById("welcome");
-
 var typing = document.getElementById("typing");
-var chatHistory = [];
+var sendBtn = document.getElementById("sendBtn");
+
+var API_URL = "/chat";
 var conversations = [];
 var currentChatId = Date.now();
+var chatHistory = [];
+var isSending = false;
+
+function loadHistory() {
+  try {
+    var saved = JSON.parse(
+      localStorage.getItem("toxicAIConversations") || "[]"
+    );
+    conversations = Array.isArray(saved) ? saved : [];
+  } catch (e) {
+    conversations = [];
+  }
+}
 
 function saveHistory() {
   try {
     localStorage.setItem(
-      "myAIConversations",
+      "toxicAIConversations",
       JSON.stringify(conversations)
     );
-  } catch (error) {
-    console.log("Could not save chat history.");
+  } catch (e) {
+    console.warn("Chat history could not be saved.");
   }
 }
 
-function saveCurrentMessage(text, sender) {
-  var chat = conversations.find(function(item) {
+loadHistory();
+
+function saveMessage(text, sender) {
+  var chat = conversations.find(function (item) {
     return item.id === currentChatId;
   });
 
   if (!chat) {
     chat = {
       id: currentChatId,
-      title: text.slice(0, 30),
+      title: text.slice(0, 40),
       messages: []
     };
-
-    conversations.push(chat);
+    conversations.unshift(chat);
   }
 
   chat.messages.push({
@@ -43,33 +58,15 @@ function saveCurrentMessage(text, sender) {
   saveHistory();
 }
 
-function loadHistory() {
-  try {
-    conversations = JSON.parse(
-      localStorage.getItem("myAIConversations") || "[]"
-    );
-
-    if (!Array.isArray(conversations)) {
-      conversations = [];
-    }
-  } catch (error) {
-    conversations = [];
-  }
-}
-
-loadHistory();
-
 function addMessage(text, sender) {
-  if (welcome) {
-    welcome.style.display = "none";
-  }
+  if (welcome) welcome.style.display = "none";
 
   var row = document.createElement("div");
   row.className = "message " + sender;
 
   var avatar = document.createElement("div");
   avatar.className = "avatar";
-  avatar.textContent = sender === "user" ? "You" : "AI";
+  avatar.textContent = sender === "user" ? "YOU" : "AI";
 
   var bubble = document.createElement("div");
   bubble.className = "bubble";
@@ -77,76 +74,173 @@ function addMessage(text, sender) {
 
   row.appendChild(avatar);
   row.appendChild(bubble);
-  messages.appendChild(row);
 
+  messages.appendChild(row);
   messages.scrollTop = messages.scrollHeight;
 }
 
-function getReply(question) {
-  var q = question.toLowerCase();
+function showTyping(show) {
+  if (typing) {
+    typing.style.display = show ? "block" : "none";
+    if (show) messages.scrollTop = messages.scrollHeight;
+  }
 
-  if (q.indexOf("hello") !== -1 ||
-    q.indexOf("helo") !== -1 ||
-    q.indexOf("hi") === 0) {
-  return "Hello bhai! Welcome to My AI Chat. How can I help you?";
+  if (sendBtn) {
+    sendBtn.disabled = show;
+    sendBtn.textContent = show ? "Thinking..." : "Send ↑";
+  }
 }
 
-  if (q.indexOf("html") !== -1) {
-    return "HTML is the language used to structure a web page. It adds headings, paragraphs, images and buttons.";
+function clearScreen() {
+  Array.from(messages.children).forEach(function (child) {
+    if (child !== welcome && child !== typing) {
+      child.remove();
+    }
+  });
+
+  if (welcome) {
+    welcome.style.display = "block";
+    messages.prepend(welcome);
   }
 
-  if (q.indexOf("javascript") !== -1) {
-    return "JavaScript makes websites interactive. It can handle clicks, messages, forms and dynamic content.";
-  }
-
-  if (q.indexOf("your name") !== -1 ||
-      q.indexOf("who are you") !== -1) {
-    return "I am your My AI Chat demo assistant.";
-  }
-
-  return "I received your message: \"" + question +
-    "\". This is a demo reply. Connect a real AI API to get intelligent answers.";
+  if (typing) messages.appendChild(typing);
+  showTyping(false);
 }
 
-form.addEventListener("submit", function(event) {
+async function askAI(question) {
+  var response;
+
+  try {
+    response = await fetch(API_URL, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "Accept": "application/json"
+      },
+      body: JSON.stringify({
+        message: question,
+        history: chatHistory
+      })
+    });
+  } catch (error) {
+    throw new Error(
+      "Server se connection nahi ho raha. Render par website aur backend check karo."
+    );
+  }
+
+  var raw = await response.text();
+  var data;
+
+  try {
+    data = JSON.parse(raw);
+  } catch (error) {
+    if (raw.trim().startsWith("<")) {
+      throw new Error(
+        "Server ne JSON ke badle HTML bheja. API route galat ho sakta hai. app.py mein /chat route check karo."
+      );
+    }
+
+    throw new Error(
+      "Server ka response valid JSON nahi hai. Render Logs check karo."
+    );
+  }
+
+  if (!response.ok) {
+    throw new Error(
+      data.error || data.message ||
+      ("Server error: HTTP " + response.status)
+    );
+  }
+
+  var answer =
+    data.reply ||
+    data.response ||
+    data.answer ||
+    data.output ||
+    data.text;
+
+  if (typeof answer !== "string" || !answer.trim()) {
+    throw new Error(
+      data.error || "AI ka answer nahi mila. Flask API response check karo."
+    );
+  }
+
+  return answer.trim();
+}
+
+form.addEventListener("submit", async function (event) {
   event.preventDefault();
 
-  var question = input.value.trim();
+  if (isSending) return;
 
-  if (!question) {
-    return;
-  }
+  var question = input.value.trim();
+  if (!question) return;
+
+  isSending = true;
 
   addMessage(question, "user");
+  saveMessage(question, "user");
+
+  chatHistory.push({
+    role: "user",
+    content: question
+  });
+
   input.value = "";
-  input.focus();
+  showTyping(true);
 
-  var reply = getReply(question);
-  addMessage(reply, "assistant");
+  try {
+    var answer = await askAI(question);
+
+    addMessage(answer, "assistant");
+    saveMessage(answer, "assistant");
+
+    chatHistory.push({
+      role: "assistant",
+      content: answer
+    });
+  } catch (error) {
+    addMessage("Error: " + error.message, "assistant");
+    console.error("TOXIC-AI request failed:", error);
+  } finally {
+    showTyping(false);
+    isSending = false;
+    input.focus();
+  }
 });
 
-document.getElementById("newChat").addEventListener("click", function() {
-  messages.innerHTML = "";
-  welcome.style.display = "block";
-  messages.appendChild(welcome);
+document.getElementById("newChat").addEventListener("click", function () {
+  currentChatId = Date.now();
+  chatHistory = [];
   input.value = "";
+  clearScreen();
   input.focus();
 });
 
-document.getElementById("clearChat").addEventListener("click", function() {
-  messages.innerHTML = "";
-  welcome.style.display = "block";
-  messages.appendChild(welcome);
+document.getElementById("clearChat").addEventListener("click", function () {
+  conversations = conversations.filter(function (chat) {
+    return chat.id !== currentChatId;
+  });
+
+  chatHistory = [];
+  saveHistory();
+  clearScreen();
+  input.focus();
 });
 
-var suggestions = document.querySelectorAll(".suggestion");
+document.querySelectorAll(".suggestion").forEach(function (button) {
+  button.addEventListener("click", function () {
+    input.value = button.textContent.trim();
 
-suggestions.forEach(function(button) {
-  button.addEventListener("click", function() {
-    input.value = button.textContent;
-    form.dispatchEvent(new Event("submit", {
-      bubbles: true,
-      cancelable: true
-    }));
+    if (typeof form.requestSubmit === "function") {
+      form.requestSubmit();
+    } else {
+      form.dispatchEvent(
+        new Event("submit", {
+          bubbles: true,
+          cancelable: true
+        })
+      );
+    }
   });
 });
