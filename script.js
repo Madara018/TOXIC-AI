@@ -1,246 +1,326 @@
 
-var form = document.getElementById("chatForm");
-var input = document.getElementById("userInput");
-var messages = document.getElementById("messages");
-var welcome = document.getElementById("welcome");
-var typing = document.getElementById("typing");
-var sendBtn = document.getElementById("sendBtn");
+let currentChatId = null;
+let busy = false;
+let readAnswersAloud = false;
+let recognition = null;
+let isListening = false;
 
-var API_URL = "/chat";
-var conversations = [];
-var currentChatId = Date.now();
-var chatHistory = [];
-var isSending = false;
+const historyBox = document.getElementById("history");
+const messagesBox = document.getElementById("messages");
+const input = document.getElementById("messageInput");
+const sendButton = document.getElementById("sendButton");
+const fileInput = document.getElementById("fileInput");
+const uploadButton = document.getElementById("uploadButton");
+const uploadStatus = document.getElementById("uploadStatus");
+const docList = document.getElementById("docList");
+const titleBox = document.querySelector(".mobile-brand");
+const micButton = document.getElementById("micButton");
+const speakToggle = document.getElementById("speakToggle");
 
-function loadHistory() {
-  try {
-    var saved = JSON.parse(
-      localStorage.getItem("toxicAIConversations") || "[]"
-    );
-    conversations = Array.isArray(saved) ? saved : [];
-  } catch (e) {
-    conversations = [];
-  }
-}
-
-function saveHistory() {
-  try {
-    localStorage.setItem(
-      "toxicAIConversations",
-      JSON.stringify(conversations)
-    );
-  } catch (e) {
-    console.warn("Chat history could not be saved.");
-  }
-}
-
-loadHistory();
-
-function saveMessage(text, sender) {
-  var chat = conversations.find(function (item) {
-    return item.id === currentChatId;
-  });
-
-  if (!chat) {
-    chat = {
-      id: currentChatId,
-      title: text.slice(0, 40),
-      messages: []
-    };
-    conversations.unshift(chat);
-  }
-
-  chat.messages.push({
-    text: text,
-    sender: sender
-  });
-
-  saveHistory();
-}
-
-function addMessage(text, sender) {
-  if (welcome) welcome.style.display = "none";
-
-  var row = document.createElement("div");
-  row.className = "message " + sender;
-
-  var avatar = document.createElement("div");
-  avatar.className = "avatar";
-  avatar.textContent = sender === "user" ? "YOU" : "AI";
-
-  var bubble = document.createElement("div");
-  bubble.className = "bubble";
-  bubble.textContent = text;
-
-  row.appendChild(avatar);
-  row.appendChild(bubble);
-
-  messages.appendChild(row);
-  messages.scrollTop = messages.scrollHeight;
-}
-
-function showTyping(show) {
-  if (typing) {
-    typing.style.display = show ? "block" : "none";
-    if (show) messages.scrollTop = messages.scrollHeight;
-  }
-
-  if (sendBtn) {
-    sendBtn.disabled = show;
-    sendBtn.textContent = show ? "Thinking..." : "Send ↑";
-  }
-}
-
-function clearScreen() {
-  Array.from(messages.children).forEach(function (child) {
-    if (child !== welcome && child !== typing) {
-      child.remove();
-    }
-  });
-
-  if (welcome) {
-    welcome.style.display = "block";
-    messages.prepend(welcome);
-  }
-
-  if (typing) messages.appendChild(typing);
-  showTyping(false);
-}
-
-async function askAI(question) {
-  var response;
-
-  try {
-    response = await fetch(API_URL, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        "Accept": "application/json"
-      },
-      body: JSON.stringify({
-        message: question,
-        history: chatHistory
-      })
-    });
-  } catch (error) {
-    throw new Error(
-      "Server se connection nahi ho raha. Render par website aur backend check karo."
-    );
-  }
-
-  var raw = await response.text();
-  var data;
+async function api(url, options = {}) {
+  const response = await fetch(url, options);
+  const raw = await response.text();
+  let data;
 
   try {
     data = JSON.parse(raw);
-  } catch (error) {
-    if (raw.trim().startsWith("<")) {
-      throw new Error(
-        "Server ne JSON ke badle HTML bheja. API route galat ho sakta hai. app.py mein /chat route check karo."
-      );
-    }
-
+  } catch {
     throw new Error(
-      "Server ka response valid JSON nahi hai. Render Logs check karo."
+      raw.trim().startsWith("<")
+        ? "Server ne HTML bheja, JSON nahi. Flask route ya deployment check karo."
+        : "Server ka response valid JSON nahi hai."
     );
   }
 
   if (!response.ok) {
-    throw new Error(
-      data.error || data.message ||
-      ("Server error: HTTP " + response.status)
-    );
+    throw new Error(data.error || "Request failed: " + response.status);
   }
 
-  var answer =
-    data.reply ||
-    data.response ||
-    data.answer ||
-    data.output ||
-    data.text;
-
-  if (typeof answer !== "string" || !answer.trim()) {
-    throw new Error(
-      data.error || "AI ka answer nahi mila. Flask API response check karo."
-    );
-  }
-
-  return answer.trim();
+  return data;
 }
 
-form.addEventListener("submit", async function (event) {
-  event.preventDefault();
+function addMessage(role, content) {
+  const welcome = messagesBox.querySelector(".welcome");
+  if (welcome) welcome.remove();
 
-  if (isSending) return;
+  const row = document.createElement("div");
+  row.className = "message " + role;
 
-  var question = input.value.trim();
-  if (!question) return;
+  const avatar = document.createElement("div");
+  avatar.className = "avatar";
+  avatar.textContent = role === "user" ? "YOU" : "AI";
 
-  isSending = true;
+  const text = document.createElement("div");
+  text.className = "content";
+  text.textContent = content;
 
-  addMessage(question, "user");
-  saveMessage(question, "user");
+  row.append(avatar, text);
+  messagesBox.appendChild(row);
+  messagesBox.scrollTop = messagesBox.scrollHeight;
+}
 
-  chatHistory.push({
-    role: "user",
-    content: question
+function showWelcome() {
+  messagesBox.innerHTML = `
+    <div class="welcome">
+      <div class="welcome-icon">✦</div>
+      <div class="eyebrow">WELCOME TO TOXIC AI</div>
+      <h1>Your ideas.<br><span>Unlimited possibilities.</span></h1>
+      <p>Ask questions, explore ideas, or upload a document to get started.</p>
+      <div class="suggestions">
+        <button class="suggestion">Explain HTML simply</button>
+        <button class="suggestion">What is JavaScript?</button>
+        <button class="suggestion">Help me study smarter</button>
+      </div>
+    </div>`;
+  bindSuggestions();
+}
+
+function bindSuggestions() {
+  document.querySelectorAll(".suggestion").forEach(button => {
+    button.onclick = () => {
+      input.value = button.textContent.trim();
+      document.getElementById("chatForm").requestSubmit();
+    };
   });
+}
 
+async function loadChats() {
+  const data = await api("/api/chats");
+  historyBox.innerHTML = "";
+
+  data.chats.forEach(chat => {
+    const button = document.createElement("button");
+    button.className = "chat-item" +
+      (chat.id === currentChatId ? " active" : "");
+    button.textContent = chat.title;
+    button.title = chat.title;
+    button.onclick = () => openChat(chat.id);
+    historyBox.appendChild(button);
+  });
+}
+
+function showDocuments(documents) {
+  docList.innerHTML = "";
+  documents.forEach(doc => {
+    const chip = document.createElement("span");
+    chip.className = "doc-chip";
+    chip.textContent = "📄 " + doc.original_name;
+    docList.appendChild(chip);
+  });
+}
+
+async function createChat() {
+  const data = await api("/api/chats", { method: "POST" });
+  currentChatId = data.id;
+  showWelcome();
+  showDocuments([]);
+  await loadChats();
+}
+
+async function openChat(id) {
+  const data = await api("/api/chats/" + id);
+  currentChatId = data.chat.id;
+  messagesBox.innerHTML = "";
+
+  if (!data.messages.length) {
+    showWelcome();
+  } else {
+    data.messages.forEach(m => addMessage(m.role, m.content));
+  }
+
+  showDocuments(data.documents);
+  await loadChats();
+}
+
+document.getElementById("newChat").onclick = async () => {
+  if (busy) return;
+  try {
+    await createChat();
+    uploadStatus.textContent = "New conversation ready.";
+  } catch (e) {
+    uploadStatus.textContent = e.message;
+  }
+};
+
+document.getElementById("chatForm").onsubmit = async event => {
+  event.preventDefault();
+  const message = input.value.trim();
+  if (!message || busy) return;
+
+  busy = true;
+  sendButton.disabled = true;
+  input.disabled = true;
   input.value = "";
-  showTyping(true);
+  addMessage("user", message);
+
+  const waiting = document.createElement("div");
+  waiting.className = "message";
+  waiting.textContent = "TOXIC AI is thinking...";
+  messagesBox.appendChild(waiting);
 
   try {
-    var answer = await askAI(question);
+    if (currentChatId === null) await createChat();
 
-    addMessage(answer, "assistant");
-    saveMessage(answer, "assistant");
-
-    chatHistory.push({
-      role: "assistant",
-      content: answer
+    const data = await api("/api/chat", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        chat_id: currentChatId,
+        message: message
+      })
     });
-  } catch (error) {
-    addMessage("Error: " + error.message, "assistant");
-    console.error("TOXIC-AI request failed:", error);
+
+    waiting.remove();
+    addMessage("assistant", data.reply || "No reply received.");
+
+    if (data.title) {
+      document.title = data.title + " — TOXIC AI";
+    }
+
+    speakAnswer(data.reply || "");
+    await loadChats();
+  } catch (e) {
+    waiting.remove();
+    addMessage("assistant", "Error: " + e.message);
   } finally {
-    showTyping(false);
-    isSending = false;
+    busy = false;
+    sendButton.disabled = false;
+    input.disabled = false;
     input.focus();
+  }
+};
+
+uploadButton.onclick = async () => {
+  const file = fileInput.files[0];
+  if (busy) return;
+
+  if (!file) {
+    uploadStatus.textContent = "Choose a PDF or TXT file first.";
+    return;
+  }
+
+  if (file.size > 5 * 1024 * 1024) {
+    uploadStatus.textContent = "Maximum file size is 5 MB.";
+    return;
+  }
+
+  if (currentChatId === null) {
+    try {
+      await createChat();
+    } catch (e) {
+      uploadStatus.textContent = e.message;
+      return;
+    }
+  }
+
+  const form = new FormData();
+  form.append("file", file);
+  uploadButton.disabled = true;
+  uploadStatus.textContent = "Uploading document...";
+
+  try {
+    const data = await api(
+      "/api/chats/" + currentChatId + "/documents",
+      { method: "POST", body: form }
+    );
+
+    showDocuments(data.documents);
+    uploadStatus.textContent = "Uploaded: " + data.name;
+    fileInput.value = "";
+  } catch (e) {
+    uploadStatus.textContent = "Upload failed: " + e.message;
+  } finally {
+    uploadButton.disabled = false;
+  }
+};
+
+const SpeechRecognition =
+  window.SpeechRecognition || window.webkitSpeechRecognition;
+
+if (SpeechRecognition) {
+  recognition = new SpeechRecognition();
+  recognition.lang = "hi-IN";
+  recognition.continuous = false;
+  recognition.interimResults = false;
+
+  recognition.onstart = () => {
+    isListening = true;
+    micButton.textContent = "🎙 Listening...";
+  };
+
+  recognition.onresult = event => {
+    input.value = (input.value + " " +
+      event.results[0][0].transcript).trim();
+    input.focus();
+  };
+
+  recognition.onerror = event => {
+    uploadStatus.textContent = "Voice input: " + event.error;
+  };
+
+  recognition.onend = () => {
+    isListening = false;
+    micButton.textContent = "🎤 Speak";
+  };
+
+  micButton.onclick = () => {
+    try {
+      if (isListening) recognition.stop();
+      else recognition.start();
+    } catch {
+      uploadStatus.textContent = "Please try voice input again.";
+    }
+  };
+} else {
+  micButton.disabled = true;
+  micButton.title = "Speech recognition is not supported by this browser.";
+}
+
+speakToggle.onclick = () => {
+  readAnswersAloud = !readAnswersAloud;
+  speakToggle.textContent = readAnswersAloud
+    ? "🔊 Read answers: ON"
+    : "🔊 Read answers: OFF";
+
+  if (!readAnswersAloud && window.speechSynthesis) {
+    window.speechSynthesis.cancel();
+  }
+};
+
+document.getElementById("stopSpeaking").onclick = () => {
+  if (window.speechSynthesis) window.speechSynthesis.cancel();
+};
+
+function speakAnswer(text) {
+  if (!readAnswersAloud || !window.speechSynthesis || !text) return;
+
+  window.speechSynthesis.cancel();
+  const utterance = new SpeechSynthesisUtterance(text);
+  utterance.lang = "hi-IN";
+  window.speechSynthesis.speak(utterance);
+}
+
+input.addEventListener("keydown", event => {
+  if (event.key === "Enter" && !event.shiftKey) {
+    event.preventDefault();
+    document.getElementById("chatForm").requestSubmit();
   }
 });
 
-document.getElementById("newChat").addEventListener("click", function () {
-  currentChatId = Date.now();
-  chatHistory = [];
-  input.value = "";
-  clearScreen();
-  input.focus();
-});
+async function startApp() {
+  bindSuggestions();
 
-document.getElementById("clearChat").addEventListener("click", function () {
-  conversations = conversations.filter(function (chat) {
-    return chat.id !== currentChatId;
-  });
-
-  chatHistory = [];
-  saveHistory();
-  clearScreen();
-  input.focus();
-});
-
-document.querySelectorAll(".suggestion").forEach(function (button) {
-  button.addEventListener("click", function () {
-    input.value = button.textContent.trim();
-
-    if (typeof form.requestSubmit === "function") {
-      form.requestSubmit();
+  try {
+    const data = await api("/api/chats");
+    if (data.chats.length) {
+      await openChat(data.chats[0].id);
     } else {
-      form.dispatchEvent(
-        new Event("submit", {
-          bubbles: true,
-          cancelable: true
-        })
-      );
+      await createChat();
     }
-  });
-});
+  } catch (e) {
+    showWelcome();
+    addMessage("assistant", "Could not load chats: " + e.message);
+  }
+}
+
+startApp();
