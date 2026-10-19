@@ -989,27 +989,21 @@ def chat():
     prompt_parts.append("User: " + message)
     prompt_parts.append("Assistant:")
 
-    try:
-SYSTEM_INSTRUCTION = """
-You are MyAI, created and developed by Piyush Yadav.
-If asked who created you, say:
-"I was created by Piyush Yadav. MyAI uses Google's
-Gemini AI model to generate responses."
-You are MyAI, not ChatGPT or Google Gemini itself.
+   
+    SYSTEM_INSTRUCTION = """
+You are TOXIC AI, created and developed by Piyush Yadav.
 Be helpful, honest, and friendly.
+If asked who created you, say you were created by Piyush Yadav.
+You use Google's Gemini AI model to generate responses.
 """
 
-response = client.models.generate_content(
-    model=MODEL,
-    contents=prompt,
-    config={
-        "system_instruction": SYSTEM_INSTRUCTION
-    }
-)
-
+    try:
         response = client.models.generate_content(
             model=MODEL,
-            contents="\n\n".join(prompt_parts)
+            contents="\n\n".join(prompt_parts),
+            config={
+                "system_instruction": SYSTEM_INSTRUCTION
+            }
         )
 
         reply = response.text or "I could not generate a text response."
@@ -1027,6 +1021,7 @@ response = client.models.generate_content(
             )
 
         return jsonify({"reply": reply, "title": title})
+
 
     except Exception:
         app.logger.exception("AI request failed")
