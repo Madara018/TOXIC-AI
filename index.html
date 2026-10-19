@@ -3,60 +3,76 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>TOXIC AI</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#09090f">
+  <meta name="description" content="TOXIC AI — your personal AI assistant with document chat and voice support.">
+  <title>TOXIC AI — AI Assistant</title>
   <link rel="icon" type="image/png" href="logo.png">
-  <link rel="stylesheet" href="style.css">
+  <link rel="stylesheet" href="/style.css">
 </head>
 <body>
-
   <div class="app">
     <aside class="sidebar">
-      <div class="brand"><img src="logo.png" alt="TOXIC AI logo"><h2>TOXIC <span>AI</span></h2></div>
-      <button id="newChat">+ New Chat</button>
-      <p class="side-note">Your personal AI assistant</p>
-      <div class="side-bottom">Made by you 🚀</div>
+      <div class="brand">
+        <div class="logo-mark">T<span>✦</span></div>
+        <div class="brand-name">TOXIC <span>AI</span><small>INTELLIGENCE, REIMAGINED</small></div>
+      </div>
+
+      <button class="new-chat" id="newChat">＋ New conversation</button>
+      <div class="history-label">YOUR CONVERSATIONS</div>
+      <div class="history" id="history"></div>
+
+      <div class="sidebar-footer">
+        <span class="online-dot"></span>
+        Gemini AI connection
+        <small>Created by Piyush Yadav</small>
+      </div>
     </aside>
 
-    <main class="chat">
+    <main class="main">
       <header class="topbar">
-        <div>
-          <h3>TOXIC AI</h3>
-          <span class="status">● Your personal AI assistant</span>
-        </div>
-        <button id="clearChat" class="clear-btn">Clear chat</button>
+        <div class="mobile-brand">TOXIC <span>AI</span></div>
+        <div class="model-label"><span class="online-dot"></span> AI ASSISTANT</div>
       </header>
 
       <section class="messages" id="messages">
-        <div id="typing" class="typing" style="display:none">
-          TOXIC AI is thinking...
-        </div>
         <div class="welcome" id="welcome">
-          <div class="sparkle">✦</div>
-          <h1>How can I help you?</h1>
-          <p>Ask a question and start a conversation.</p>
-          <button class="suggestion">Explain HTML simply</button>
-          <button class="suggestion">What is JavaScript?</button>
+          <div class="welcome-icon">✦</div>
+          <div class="eyebrow">WELCOME TO TOXIC AI</div>
+          <h1>Your ideas.<br><span>Unlimited possibilities.</span></h1>
+          <p>Ask questions, explore ideas, or upload a document to get started.</p>
+          <div class="suggestions">
+            <button class="suggestion">Explain HTML simply</button>
+            <button class="suggestion">What is JavaScript?</button>
+            <button class="suggestion">Help me study smarter</button>
+          </div>
         </div>
       </section>
 
-      <form id="chatForm" class="input-area">
-        <input
-          id="userInput"
-          type="text"
-          placeholder="Message TOXIC AI..."
-          autocomplete="off"
-          required
-        >
-        <button type="submit" id="sendBtn">Send ↑</button>
-      </form>
+      <footer class="bottom">
+        <div class="document-tools">
+          <label class="upload-label" for="fileInput">＋ Attach document</label>
+          <input type="file" id="fileInput" accept=".pdf,.txt">
+          <button class="upload-button" id="uploadButton">Upload</button>
+          <span id="uploadStatus">PDF or TXT · Max 5 MB</span>
+        </div>
+        <div class="doc-list" id="docList"></div>
 
-      <p class="disclaimer">
-        TOXIC AI · Your personal AI assistant
-      </p>
+        <div class="voice-controls">
+          <button class="voice-btn" id="micButton" type="button">🎤 Speak</button>
+          <button class="voice-btn" id="speakToggle" type="button">🔊 Read answers: OFF</button>
+          <button class="voice-btn" id="stopSpeaking" type="button">■ Stop voice</button>
+        </div>
+
+        <form class="composer" id="chatForm">
+          <textarea id="messageInput" rows="1" placeholder="Message TOXIC AI..." required></textarea>
+          <button class="send" id="sendButton" type="submit" aria-label="Send message">↑</button>
+        </form>
+        <div class="hint">Enter to send · Shift + Enter for a new line</div>
+        <div class="disclaimer">TOXIC AI can make mistakes. Verify important information.</div>
+      </footer>
     </main>
   </div>
-
-  <script src="script.js"></script>
+  <script src="/script.js"></script>
 </body>
 </html>
