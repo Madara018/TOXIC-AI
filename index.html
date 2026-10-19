@@ -1,0 +1,62 @@
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>TOXIC AI</title>
+  <link rel="icon" type="image/png" href="logo.png">
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+  <div class="app">
+    <aside class="sidebar">
+      <div class="brand"><img src="logo.png" alt="TOXIC AI logo"><h2>TOXIC <span>AI</span></h2></div>
+      <button id="newChat">+ New Chat</button>
+      <p class="side-note">Your personal AI assistant</p>
+      <div class="side-bottom">Made by you 🚀</div>
+    </aside>
+
+    <main class="chat">
+      <header class="topbar">
+        <div>
+          <h3>TOXIC AI</h3>
+          <span class="status">● Your personal AI assistant</span>
+        </div>
+        <button id="clearChat" class="clear-btn">Clear chat</button>
+      </header>
+
+      <section class="messages" id="messages">
+        <div id="typing" class="typing" style="display:none">
+          TOXIC AI is thinking...
+        </div>
+        <div class="welcome" id="welcome">
+          <div class="sparkle">✦</div>
+          <h1>How can I help you?</h1>
+          <p>Ask a question and start a conversation.</p>
+          <button class="suggestion">Explain HTML simply</button>
+          <button class="suggestion">What is JavaScript?</button>
+        </div>
+      </section>
+
+      <form id="chatForm" class="input-area">
+        <input
+          id="userInput"
+          type="text"
+          placeholder="Message TOXIC AI..."
+          autocomplete="off"
+          required
+        >
+        <button type="submit" id="sendBtn">Send ↑</button>
+      </form>
+
+      <p class="disclaimer">
+        TOXIC AI · Your personal AI assistant
+      </p>
+    </main>
+  </div>
+
+  <script src="script.js"></script>
+</body>
+</html>
